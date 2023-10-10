@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { body, param, query } = require('express-validator');
 const apiErrorReporter = require('../utils/apierrorreporter');
 const controller = require('../controllers/meterreadings_controller');
+const promiseHandler = require('../utils/promise-handler');
 
 /**
  * Get the numeric limit value, 100 if not specified, otherwise
@@ -16,7 +17,7 @@ const getLimit = (n) => {
     return 100;
   }
 
-  return (n > 1000 ? 1000 : n);
+  return n > 1000 ? 1000 : n;
 };
 
 // POST /meterreadings
@@ -32,31 +33,16 @@ router.post(
     body('*.tempC').isFloat(),
     apiErrorReporter,
   ],
-  async (req, res, next) => {
-    try {
-      await controller.createMeterReadings(req.body);
-      return res.status(201).send('OK');
-    } catch (err) {
-      return next(err);
-    }
-  },
+  promiseHandler((req, res, next) => controller.createMeterReadings(req.body))
 );
 
 // GET /meterreadings?n=99
 router.get(
   '/meterreadings',
-  [
-    query('n').optional().isInt({ min: 1 }).toInt(),
-    apiErrorReporter,
-  ],
-  async (req, res, next) => {
-    try {
-      const readings = await controller.getMeterReadings(getLimit(req.query.n));
-      return res.status(200).json(readings);
-    } catch (err) {
-      return next(err);
-    }
-  },
+  [query('n').optional().isInt({ min: 1 }).toInt(), apiErrorReporter],
+  promiseHandler(async (req, res, next) =>
+    controller.getMeterReadings(getLimit(req.query.n))
+  )
 );
 
 // GET /meterreadings/123?n=99
@@ -67,18 +53,9 @@ router.get(
     query('n').optional().isInt({ min: 1 }).toInt(),
     apiErrorReporter,
   ],
-  async (req, res, next) => {
-    try {
-      const readings = await controller.getMeterReadingsForSite(
-        req.params.siteId,
-        getLimit(req.query.n),
-      );
-
-      return res.status(200).json(readings);
-    } catch (err) {
-      return next(err);
-    }
-  },
+  promiseHandler((req, res, next) =>
+    controller.getMeterReadingsForSite(req.params.siteId, getLimit(req.query.n))
+  )
 );
 
 module.exports = router;
